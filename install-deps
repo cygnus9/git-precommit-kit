@@ -1,0 +1,35 @@
+#!/bin/bash
+# Dependency installer script
+# Look for all rules in all PRECOMMIT files and run the '-deps' version of all
+# mentioned scripts
+set -o nounset
+set -o errexit
+set -f # No pathname expansion
+
+gpk_dir=$(dirname $0)
+repo_root=$(git rev-parse --show-toplevel)
+
+source "$gpk_dir"/internal/helpers.sh
+
+## run_deps_installer <GLOBS> <CHECK>
+# Run the 'check-deps' variant of every word in CHECK.
+handled=""
+function run_deps_installer {
+    for check in $2; do
+        set +o errexit
+
+        installer=$check-deps
+
+        # Only if it hasn't been run yet
+        if [[ "*|$installer|*" != "$handled" ]];  then
+            $check-deps
+            handled="$handled|$installer|"
+        fi
+    done
+}
+
+
+find "$repo_root" -name PRECOMMIT -print0 | while IFS= read -r -d '' file; do
+    apply_precommits run_deps_installer "$file"
+done
+
