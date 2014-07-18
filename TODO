@@ -1,5 +1,8 @@
 - 'install-deps' script, and tell users about that if exit_code == 127
 - split out helper routines to functions library
 - write documentation
-    - how to use
+    - as a repo creator
+    - as a repo user (developer)
     - how to write add'l check scripts
+- add ignore-branch statement (but then--what about merges or rebases?)
+- make gpk configurable through git
