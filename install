@@ -1,0 +1,9 @@
+#!/bin/bash
+set -o nounset
+set -o errexit
+
+internal=$(dirname $0)/internal
+repo_root=$(git rev-parse --show-toplevel)
+
+cp $internal/pre-commit $repo_root/.git/hooks
+chmod +x $repo_root/.git/hooks/pre-commit

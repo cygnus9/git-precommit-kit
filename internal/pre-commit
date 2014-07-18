@@ -1,0 +1,97 @@
+#!/bin/bash
+# Executed in root directory of tree; simply executed upon commit so the 
+# state of the tree is as-is.
+set -o nounset
+set -o errexit
+set -f # No pathname expansion
+
+#------------------------------------------------------------
+# Checkout commit to staging area 
+
+repo_root=$(git rev-parse --show-toplevel)
+old_version=$(mktemp -d -t gpk)
+new_version=$(mktemp -d -t gpk)
+one_log=$(mktemp -t gpk)
+exit_script=$(mktemp -t gpk)
+function cleanup {
+    rm -rf "$new_version"
+    rm -rf "$old_version"
+    rm $one_log
+    rm $exit_script
+}
+trap cleanup EXIT
+
+# FIXME: Make this more efficient by using a persistent clone or something?
+git clone --quiet --local --shared "$repo_root" "$old_version"
+
+mkdir -p "$new_version"
+git checkout-index --prefix="$new_version"/ -af
+
+echo true > "$exit_script"
+chmod +x "$exit_script"
+
+red="$(tput setaf 1)"
+yellow="$(tput setaf 3)"
+normal="$(tput sgr0)"
+
+#------------------------------------------------------------
+# Iterate over changed files
+# For efficiency's sake, we're only going to check changed files.
+
+## apply_check CHECK TARGET
+function apply_check {
+    local check="$1"
+    local new_file="$new_version"/"$2"
+    local old_file="$old_version"/"$2"
+    (cd "$new_version"/gpk/checks && export PATH=$PATH:. && $check "$new_file" "$old_file" > "$one_log" 2>&1) || {
+        printf "[${red}fail${normal}] %-20s %s\n" "$1" "$2" >&2
+        cat "$one_log" >&2
+        echo false > "$exit_script"
+    }
+}
+
+## apply_rules RULES_FILE TARGET SHORTNAME
+# Apply all rules in RULES_FILE to TARGET
+function apply_rules {
+    while read -r rule; do
+        IFS=':' read -ra parts <<< "$rule"
+
+        for glob in ${parts[0]}; do
+            if $(set -f; [[ "$2" == $glob ]]); then
+                # Execute the consequent part of the rule (stripping initial
+                # space off the consequent if there)
+                apply_check "${parts[1]# }" "$2"
+                break  # Only one glob per rule per customer
+            fi
+        done
+    done < "$1"
+}
+
+## apply_precommits FILE
+# Find the precommit rule for a file and execute it
+function apply_precommits {
+    local inrepo_dir="$(dirname "$1")"
+    local dir="$new_version"/"$inrepo_dir"
+
+    if [[ -f "$dir"/PRECOMMIT ]]; then apply_rules "$dir"/PRECOMMIT "$1"; fi
+    while [[ "$inrepo_dir" != "." ]]; do
+        inrepo_dir="$(dirname "$inrepo_dir")"
+        dir="$new_version"/"$inrepo_dir"
+        if [[ -f "$dir"/PRECOMMIT ]]; then apply_rules "$dir"/PRECOMMIT "$1"; fi
+    done
+}
+
+#------------------------------------------------------------
+# Read list of changed files and go
+
+# This spawns a subshell because of the pipe, so we can't use
+# variables to communicate upwards.
+(git diff -z --cached --name-only --diff-filter=ACMR) | while IFS= read -r -d '' file; do
+    apply_precommits "$file"
+done
+
+if ! "$exit_script"; then
+    echo "[${yellow}gpk${normal}] One or more pre-commit checks failed. Please fix them and commit again." >&2
+fi
+
+"$exit_script"

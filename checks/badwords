@@ -1,0 +1,5 @@
+#!/bin/bash
+grep -n 'foo\|bar\|baz' "$1" || exit 0
+
+echo File contains naughty words! >&2
+exit 1

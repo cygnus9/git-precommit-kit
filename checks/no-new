@@ -1,0 +1,38 @@
+#!/bin/bash
+# Script to check whether an error checking script produces no additional
+# warnings. This is to allow introducing checks in a nonperfect situation.
+#
+# Usage: no-new SCRIPT NEWFILE OLDFILE
+set -o nounset
+set -o errexit
+
+script="$1"
+new="$2"
+old="$3"
+
+if [[ -f "$old" && ! -f "$new" ]]; then exit 0; fi  # File deleted
+
+# Otherwise, file is changed--compare
+old_log=$(mktemp -t gpk)
+new_log=$(mktemp -t gpk)
+err=$(mktemp -t gpk)
+function cleanup {
+    rm "$old_log"
+    rm "$new_log"
+    rm "$err"
+}
+trap cleanup EXIT
+
+# File added, run the simple script on the new file
+set +o errexit
+if $script "$new" 1>"$new_log" 2>"$err"; then exit 0; fi  # Apparently no errors any more, so comparing is pointless
+
+if [[ ! -f "$old" ]]; then cat "$new_log"; cat "$err" 1>&2; exit 1; fi  # No old file so use new errors
+
+$script "$old" 1>"$old_log" 2>"$err"
+
+comm -13 "$old_log" "$new_log" | grep . || exit 0
+
+# Produced output, so that's residual errors
+cat "$err" >&2
+exit 1
