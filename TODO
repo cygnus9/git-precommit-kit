@@ -1,0 +1,5 @@
+- 'install-deps' script, and tell users about that if exit_code == 127
+- split out helper routines to functions library
+- write documentation
+    - how to use
+    - how to write add'l check scripts

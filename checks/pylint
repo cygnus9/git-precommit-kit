@@ -1,0 +1,2 @@
+#!/bin/bash
+pylint --reports=n --include-ids=y --persistent=n giraffe-rpc-proxy "$1"
