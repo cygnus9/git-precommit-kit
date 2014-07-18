@@ -10,6 +10,9 @@ gpk_dir=$(dirname $0)
 repo_root=$(git rev-parse --show-toplevel)
 
 source "$gpk_dir"/internal/helpers.sh
+source "$gpk_dir"/internal/deps-helpers.sh
+
+exit_code=true
 
 ## run_deps_installer <GLOBS> <CHECK>
 # Run the 'check-deps' variant of every word in CHECK.
@@ -21,15 +24,19 @@ function run_deps_installer {
         installer=$check-deps
 
         # Only if it hasn't been run yet
-        if [[ "*|$installer|*" != "$handled" ]];  then
-            $check-deps
+        if (cd "$gpk_dir"/checks && [[ -f "$installer" && "*|$installer|*" != "$handled" ]]); then
+            (cd "$gpk_dir"/checks && export PATH=$PATH:. && $installer) || exit_code="false"
             handled="$handled|$installer|"
         fi
     done
 }
 
+while IFS= read -r -d '' file; do
+    read_rules run_deps_installer "$file"
+done < <(find "$repo_root" -name PRECOMMIT -print0)
 
-find "$repo_root" -name PRECOMMIT -print0 | while IFS= read -r -d '' file; do
-    apply_precommits run_deps_installer "$file"
-done
+if ! $exit_code; then
+    echo Some dependencies could not be installed. Please install them by hand.
+fi
 
+$exit_code

@@ -1,0 +1,13 @@
+#!/bin/bash
+# Try to get pylint, first from distro, then from pip
+avail pylint && exit 0
+
+echo Need to install pylint
+
+try-apt pylint
+avail pylint && exit 0
+
+try-pip pylint
+avail pylint && exit 0
+
+exit 1

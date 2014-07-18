@@ -37,7 +37,7 @@ function read_rules {
         IFS=':' read -ra parts <<< "$rule"
 
         $1 "${parts[0]}" "${parts[1]}"
-    done < "$1"
+    done < "$2"
 }
 
 ## apply_precommits FILE
