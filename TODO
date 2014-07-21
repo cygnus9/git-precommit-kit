@@ -1,5 +1,4 @@
-- 'install-deps' script, and tell users about that if exit_code == 127
-- split out helper routines to functions library
+- make no-new error out if an error occurred producing output
 - write documentation
     - as a repo creator
     - as a repo user (developer)

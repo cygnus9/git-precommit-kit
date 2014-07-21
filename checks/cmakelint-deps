@@ -1,0 +1,12 @@
+#!/bin/bash
+# Try to get cmakelint, first from distro, then from pip
+TOOL=cmakelint
+PKG=cmakelint
+avail $TOOL && exit 0
+
+echo Need to install $TOOL
+
+try-pip $PKG
+avail $TOOL && exit 0
+
+exit 1

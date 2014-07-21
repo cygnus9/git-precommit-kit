@@ -26,6 +26,7 @@ trap cleanup EXIT
 # File added, run the simple script on the new file
 set +o errexit
 if $script "$new" 1>"$new_log" 2>"$err"; then exit 0; fi  # Apparently no errors any more, so comparing is pointless
+err=$?  # Capture this value if it happens to be 127
 
 if [[ ! -f "$old" ]]; then cat "$new_log"; cat "$err" 1>&2; exit 1; fi  # No old file so use new errors
 
@@ -35,4 +36,4 @@ comm -13 "$old_log" "$new_log" | grep . || exit 0
 
 # Produced output, so that's residual errors
 cat "$err" >&2
-exit 1
+exit $err

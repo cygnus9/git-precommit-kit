@@ -7,9 +7,10 @@ function apply_check {
     local new_file="$new_version"/"$2"
     local old_file="$old_version"/"$2"
     (cd "$new_version"/gpk/checks && export PATH=$PATH:. && $check "$new_file" "$old_file" > "$one_log" 2>&1) || {
+        if [[ $? -eq 127 ]]; then not_found=true; fi
         printf "[${red}fail${normal}] %-20s %s\n" "$1" "$2" >&2
         cat "$one_log" >&2
-        echo false > "$exit_script"
+        exit_code=false
     }
 }
 

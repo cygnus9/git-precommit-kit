@@ -12,12 +12,10 @@ repo_root=$(git rev-parse --show-toplevel)
 old_version=$(mktemp -d -t gpk)
 new_version=$(mktemp -d -t gpk)
 one_log=$(mktemp -t gpk)
-exit_script=$(mktemp -t gpk)
 function cleanup {
     rm -rf "$new_version"
     rm -rf "$old_version"
     rm $one_log
-    rm $exit_script
 }
 trap cleanup EXIT
 
@@ -30,8 +28,8 @@ git checkout-index --prefix="$new_version"/ -af
 # Load helpers from latest version
 source "$new_version"/gpk/internal/helpers.sh
 
-echo true > "$exit_script"
-chmod +x "$exit_script"
+exit_code=true
+not_found=false
 
 red="$(tput setaf 1)"
 yellow="$(tput setaf 3)"
@@ -46,12 +44,15 @@ normal="$(tput sgr0)"
 
 # This spawns a subshell because of the pipe, so we can't use
 # variables to communicate upwards.
-(git diff -z --cached --name-only --diff-filter=ACMR) | while IFS= read -r -d '' file; do
+while IFS= read -r -d '' file; do
     apply_precommits "$file"
-done
+done < <(git diff -z --cached --name-only --diff-filter=ACMR)
 
-if ! "$exit_script"; then
+if ! $exit_code; then
     echo "[${yellow}gpk${normal}] One or more pre-commit checks failed. Please fix them and commit again." >&2
 fi
+if $not_found; then
+    echo "[${yellow}gpk${normal}] It looks like some tools could not be found. Try running gpk/install-deps." >&2
+fi
 
-"$exit_script"
+$exit_code
