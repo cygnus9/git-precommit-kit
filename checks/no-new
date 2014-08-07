@@ -15,22 +15,22 @@ if [[ -f "$old" && ! -f "$new" ]]; then exit 0; fi  # File deleted
 # Otherwise, file is changed--compare
 old_log=$(mktemp -t gpk)
 new_log=$(mktemp -t gpk)
-err=$(mktemp -t gpk)
+err_log=$(mktemp -t gpk)
 function cleanup {
     rm "$old_log"
     rm "$new_log"
-    rm "$err"
+    rm "$err_log"
 }
 trap cleanup EXIT
 
 # File added, run the simple script on the new file
 set +o errexit
-if $script "$new" 1>"$new_log" 2>"$err"; then exit 0; fi  # Apparently no errors any more, so comparing is pointless
+if $script "$new" 1>"$new_log" 2>"$err_log"; then exit 0; fi  # Apparently no errors any more, so comparing is pointless
 err=$?  # Capture this value if it happens to be 127
 
-if [[ ! -f "$old" ]]; then cat "$new_log"; cat "$err" 1>&2; exit 1; fi  # No old file so use new errors
+if [[ ! -f "$old" ]]; then cat "$new_log"; cat "$err_log" 1>&2; exit 1; fi  # No old file so use new errors
 
-$script "$old" 1>"$old_log" 2>"$err"
+$script "$old" 1>"$old_log" 2>"$err_log"
 
 comm -13 "$old_log" "$new_log" | grep . || exit 0
 

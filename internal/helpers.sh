@@ -54,4 +54,3 @@ function apply_precommits {
         if [[ -f "$dir"/PRECOMMIT ]]; then apply_rules "$dir"/PRECOMMIT "$1"; fi
     done
 }
-
