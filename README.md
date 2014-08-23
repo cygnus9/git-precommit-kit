@@ -39,6 +39,13 @@ contents of this repository into a `gpk` subdirectory in your repository.  You
 can download it as plain files, or use `git submodules` or `git subtree` to get
 it.
 
+    git remote add gpk git@github.com:rix0rrr/git-precommit-kit.git
+    git subtree add --prefix=gpk/ --squash gpk master
+
+Updating:
+
+    git subtree pull --prefix=gpk/ --squash gpk master
+
 ## Installing for developers (once per user)
 
 As a developer, from the top of your repository, run:
