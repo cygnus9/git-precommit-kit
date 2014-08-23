@@ -1,0 +1,12 @@
+#!/bin/bash
+# Try to get jshint from npm
+TOOL=jshint
+PKG=jshint
+avail $TOOL && exit 0
+
+echo Need to install $TOOL
+
+try-npm $PKG
+avail $TOOL && exit 0
+
+exit 1

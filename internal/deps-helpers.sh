@@ -30,3 +30,10 @@ function try-pip {
     echo Installing $1 from pip. You may need to enter your password.
     sudo pip install $1
 }
+
+function try-npm {
+    if ! avail npm; then exit 0; fi
+
+    echo Installing $1 from npm. You may need to enter your password.
+    sudo npm install -g $1
+}
