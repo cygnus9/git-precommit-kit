@@ -1,0 +1,11 @@
+#!/bin/bash
+# Check source files for the phrase NOCOMMIT. Fail if it occurs.
+#
+# This is helpful when you temporarily need to change something in your source
+# to debug it (i.e., port changes, debug statements, etc), but have to take the
+# change out before you commit it. Marking it with NOCOMMIT helps you in case
+# you accidentally forget it.
+grep -n 'NOCOMMIT' "$1" || exit 0
+
+echo "File contains NOCOMMIT tag!" >&2
+exit 1
