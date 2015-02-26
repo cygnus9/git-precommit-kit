@@ -7,5 +7,4 @@
 # you accidentally forget it.
 grep -n 'NOCOMMIT' "$1" || exit 0
 
-echo "File contains NOCOMMIT tag!" >&2
-exit 1
+exit 0

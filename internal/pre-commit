@@ -1,58 +1,89 @@
-#!/bin/bash
-# Executed in root directory of tree; simply executed upon commit so the 
-# state of the tree is as-is.
-set -o nounset
-set -o errexit
-set -f # No pathname expansion
+#!/usr/bin/env python
+"""GPK pre-commit script.
 
-#------------------------------------------------------------
-# Checkout commit to staging area 
+Check all files changed in this commit against the rules defined in the
+PRECOMMIT files.
 
-repo_root=$(git rev-parse --show-toplevel)
-old_version=$(mktemp -d -t gpk)
-new_version=$(mktemp -d -t gpk)
-one_log=$(mktemp -t gpk)
-function cleanup {
-    rm -rf "$new_version"
-    rm -rf "$old_version"
-    rm $one_log
-}
-trap cleanup EXIT
+We'll always use the version of PRECOMMITs and GPK from the working tree.  This
+has the potential to commit files that were checked against different rules
+than those in the repository. However, the alternative means having to commit
+GPK-related files while you're committing code, which pollutes the commit
+history. We'll leave this to individual developer responsibility.
 
-# FIXME: Make this more efficient by using a persistent clone or something?
-git clone --quiet --local --shared "$repo_root" "$old_version"
+"""
 
-mkdir -p "$new_version"
-git checkout-index --prefix="$new_version"/ -af
+import sys
+from os import path
 
-# Load helpers from latest version
-source "$new_version"/gpk/internal/helpers.sh
 
-exit_code=true
-not_found=false
+def main():
+    # Find GPK modules and put them on the path
+    internal_dir = path.dirname(path.realpath(sys.argv[0]))
+    sys.path.insert(0, internal_dir)
+    import gpk
 
-red="$(tput setaf 1)"
-yellow="$(tput setaf 3)"
-normal="$(tput sgr0)"
+    gpk_path = path.join(internal_dir, '..')
 
-#------------------------------------------------------------
-# Iterate over changed files
-# For efficiency's sake, we're only going to check changed files.
+    # Get the root directory
+    repo_root = gpk.shell(['git', 'rev-parse', '--show-toplevel'])
 
-#------------------------------------------------------------
-# Read list of changed files and go
+    # Get a list of files that got changed in the current commit.
+    changed_files = filter(None, gpk.shell([
+            'git', 'diff', '--cached',
+                           '--name-only',
+                           '--diff-filter=ACMR'
+            ]).split('\n'))
 
-# This spawns a subshell because of the pipe, so we can't use
-# variables to communicate upwards.
-while IFS= read -r -d '' file; do
-    apply_precommits "$file"
-done < <(git diff -z --cached --name-only --diff-filter=ACMR)
+    checks = gpk.find_checks(repo_root, changed_files, gpk_path)
+    if not checks:
+        # Nothing to do, exit quickly
+        sys.exit(0)
 
-if ! $exit_code; then
-    echo "[${yellow}gpk${normal}] One or more pre-commit checks failed. Please fix them and commit again." >&2
-fi
-if $not_found; then
-    echo "[${yellow}gpk${normal}] It looks like some tools could not be found. Try running gpk/install-deps." >&2
-fi
+    writer = gpk.ConsoleWriter()
 
-$exit_code
+    with gpk.SourceTree() as new_source:
+        gpk.shell(['git', 'checkout-index', '--prefix', new_source.dir + '/',
+                                            '-af'])
+        new_source.available = True
+
+        with gpk.SourceTree() as old_source:
+            if checks.requires_old_source:
+                # FIXME: Make this more efficient by using a persistent clone or
+                # something?
+                gpk.shell(['git', 'clone', '--quiet',
+                                           '--local',
+                                           '--shared',
+                                           repo_root,
+                                           old_source.dir])
+                old_source.available = True
+
+            context = gpk.RunContext(gpk_path, new_source, old_source, writer)
+            checks.run(context)
+            context.report()
+
+    if context.errors:
+        sys.exit(1)
+    else:
+        sys.exit(0)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except RuntimeError, e:
+        sys.stderr.write(str(e))
+        sys.exit(1)
+
+
+##------------------------------------------------------------
+## Iterate over changed files
+## For efficiency's sake, we're only going to check changed files.
+
+#if ! $exit_code; then
+    #echo "[${yellow}gpk${normal}] ." >&2
+#fi
+#if $not_found; then
+    #echo "[${yellow}gpk${normal}] It looks like some tools could not be found. Try running gpk/install-deps." >&2
+#fi
+
+#$exit_code

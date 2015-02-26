@@ -40,7 +40,7 @@ can download it as plain files, or use `git submodules` or `git subtree` to get
 it.
 
     git remote add gpk git@github.com:rix0rrr/git-precommit-kit.git
-    git subtree add --prefix=gpk/ --squash gpk master
+    git subtree add --prefix=gpk/ -m "Add Git Precommit Kit" --squash gpk master
 
 Updating:
 

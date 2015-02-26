@@ -2,6 +2,3 @@
 # This file exists to test/demonstrate the 'check scripts' capabilities without
 # needing additional dependencies. It should not be used in practice.
 grep -n 'foo\|bar\|baz' "$1" || exit 0
-
-echo "File contains indecipherable words!" >&2
-exit 1

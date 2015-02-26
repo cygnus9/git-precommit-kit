@@ -1,0 +1,21 @@
+# This is a library of standard GPK check definitions.
+# 
+# You don't NEED to use these, all that matters is that the block is complete,
+# but you can for easy reference. It's possible to customize any check by
+# postfixing it with another tuple to override values.
+#
+# Check scripts are with respect to the 'check' directory, should exit without
+# error and output a list of validation failures to stdout. Installers are by
+# default called check + '-deps'. 
+
+
+# Pylint
+pylint = {
+  pattern = '*.py';
+  check = 'pylint';
+};
+
+nocommit = {
+  pattern = '*';
+  check = 'nocommit';
+}
