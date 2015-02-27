@@ -63,8 +63,10 @@ class SourceTree(object):
         shutil.rmtree(self.dir)
 
 
-class Aborted(RuntimeError):
-    pass
+class SilentFailure(RuntimeError): pass
+class ScriptError(RuntimeError): pass
+class Aborted(RuntimeError): pass
+class MissingScript(RuntimeError): pass
 
 
 class CheckFailedError(RuntimeError):
@@ -146,17 +148,19 @@ class Check(object):
         deps_script = self.check_script + '-deps'
 
         if self.check_script not in context.prereqs_checked:
-            if not context.script_exists(deps_script):
-                context.prereqs_checked[self.check_script] = True
-            else:
+            context.prereqs_checked[self.check_script] = True
+            if context.script_exists(deps_script):
                 context.prereqs_checked[self.check_script] = False
+                # Exception can occur here
                 context.run_script([deps_script], env=self.env)
                 context.prereqs_checked[self.check_script] = True
         self.prerequisite_satisfied = context.prereqs_checked[self.check_script]
 
     def run(self, context):
         if not self.prerequisite_satisfied:
-            return False
+            raise SilentFailure()
+        if not context.script_exists(self.check_script):
+            raise MissingScript('Script not found: %r' % self.check_script)
 
         no_new = self.rule.get('no_new', False)
 
@@ -211,8 +215,8 @@ class Checks(object):
         for check in self.checks:
             with context.error_catcher(print_progress=False):
                 check.check_prerequisites(context)
-        if context.errors:
-            return
+        #if context.errors:
+            #return
 
         for check in self.checks:
             with context.error_catcher():
@@ -320,7 +324,7 @@ class RunContext(object):
                                           ' '.join(cmd)))
                     p.wait()
                 if p.returncode != 0 and not ignore_exitcode:
-                    raise RuntimeError('%r exited with non-zero exit code %d' % (' '.join(cmd), p.returncode))
+                    raise ScriptError('%r exited with non-zero exit code %d' % (' '.join(cmd), p.returncode))
 
                 if interrupted:
                     # I'd like to continue, but we can't
@@ -329,7 +333,7 @@ class RunContext(object):
             finally:
                 OPEN_PROCESSES.remove(p)
         except OSError, e:
-            raise RuntimeError('Error while executing %r: %s' % (cmd, e))
+            raise ScriptError('Error while executing %r: %s' % (' '.join(cmd), e))
         except KeyboardInterrupt:
             raise Aborted('Command %r interrupted by user' % cmd)
 
@@ -350,7 +354,8 @@ class ErrorCatcher(object):
             return False
 
         if type:
-            self.context.errors.append(value)
+            if not (type is SilentFailure):
+                self.context.errors.append(value)
             if self.print_progress:
                 self.context.writer.fail()
         else:

@@ -1,13 +1,7 @@
 #!/bin/bash
 # Try to get pylint, first from distro, then from pip
-avail pylint && exit 0
-
-echo Need to install pylint
-
-try-apt pylint
-avail pylint && exit 0
-
-try-pip pylint
-avail pylint && exit 0
-
-exit 1
+set -o errexit
+pylint --version | grep 'pylint 1.4' || {
+    echo "Please install pylint 1.4+" >&2
+    exit 1
+}
