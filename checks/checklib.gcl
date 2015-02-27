@@ -18,4 +18,4 @@ pylint = {
 nocommit = {
   pattern = '*';
   check = 'nocommit';
-}
+};

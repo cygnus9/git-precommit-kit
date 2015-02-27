@@ -22,7 +22,7 @@ def main():
     sys.path.insert(0, internal_dir)
     import gpk
 
-    gpk_path = path.join(internal_dir, '..')
+    gpk_path = path.normpath(path.join(internal_dir, '..'))
 
     # Get the root directory
     repo_root = gpk.shell(['git', 'rev-parse', '--show-toplevel'])
@@ -35,36 +35,39 @@ def main():
             ]).split('\n'))
 
     checks = gpk.find_checks(repo_root, changed_files, gpk_path)
-    if not checks:
+    if not checks.checks:
         # Nothing to do, exit quickly
         sys.exit(0)
 
-    writer = gpk.ConsoleWriter()
+    try:
+        writer = gpk.ConsoleWriter()
 
-    with gpk.SourceTree() as new_source:
-        gpk.shell(['git', 'checkout-index', '--prefix', new_source.dir + '/',
-                                            '-af'])
-        new_source.available = True
+        with gpk.SourceTree() as new_source:
+            gpk.shell(['git', 'checkout-index', '--prefix', new_source.dir + '/',
+                                                '-af'])
+            new_source.available = True
 
-        with gpk.SourceTree() as old_source:
-            if checks.requires_old_source:
-                # FIXME: Make this more efficient by using a persistent clone or
-                # something?
-                gpk.shell(['git', 'clone', '--quiet',
-                                           '--local',
-                                           '--shared',
-                                           repo_root,
-                                           old_source.dir])
-                old_source.available = True
+            with gpk.SourceTree() as old_source:
+                if checks.requires_old_source:
+                    # FIXME: Make this more efficient by using a persistent clone or
+                    # something?
+                    gpk.shell(['git', 'clone', '--quiet',
+                                            '--local',
+                                            '--shared',
+                                            repo_root,
+                                            old_source.dir])
+                    old_source.available = True
 
-            context = gpk.RunContext(gpk_path, new_source, old_source, writer)
-            checks.run(context)
-            context.report()
+                context = gpk.RunContext(gpk_path, new_source, old_source, writer)
+                checks.run(context)
+                context.report()
 
-    if context.errors:
-        sys.exit(1)
-    else:
-        sys.exit(0)
+        if context.errors:
+            sys.exit(1)
+        else:
+            sys.exit(0)
+    except gpk.Aborted:
+        pass
 
 
 if __name__ == '__main__':
@@ -73,17 +76,3 @@ if __name__ == '__main__':
     except RuntimeError, e:
         sys.stderr.write(str(e))
         sys.exit(1)
-
-
-##------------------------------------------------------------
-## Iterate over changed files
-## For efficiency's sake, we're only going to check changed files.
-
-#if ! $exit_code; then
-    #echo "[${yellow}gpk${normal}] ." >&2
-#fi
-#if $not_found; then
-    #echo "[${yellow}gpk${normal}] It looks like some tools could not be found. Try running gpk/install-deps." >&2
-#fi
-
-#$exit_code

@@ -5,10 +5,12 @@ import difflib
 import doctest
 import fnmatch
 import os
+import signal
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import threading
 
 import cStringIO as StringIO
@@ -16,6 +18,26 @@ from os import path
 
 import gcl
 
+
+
+#--------------------------------------------------------------------
+# Interrupt handling
+#
+# I'd like to continue after killing a single test, but git has already died
+# after the initial SIGINT, so we have no other opportunity than to simply die.
+#
+
+interrupted = False
+OPEN_PROCESSES = []
+
+def signal_handler(signum, frame):
+    global interrupted
+    interrupted = True
+    for p in OPEN_PROCESSES:
+        p.kill()
+signal.signal(signal.SIGINT, signal_handler)
+
+#--------------------------------------------------------------------
 
 class SourceTree(object):
     """Temporary directory with context manager semantics.
@@ -39,6 +61,10 @@ class SourceTree(object):
 
     def __exit__(self, type, value, traceback):
         shutil.rmtree(self.dir)
+
+
+class Aborted(RuntimeError):
+    pass
 
 
 class CheckFailedError(RuntimeError):
@@ -95,6 +121,9 @@ class Check(object):
         self.filename = filename
         self.prerequisite_satisfied = False
 
+    def __repr__(self):
+        return 'Check(%r, %r)' % (self.rule, self.filename)
+
     @property
     def requires_old_source(self):
         return self.rule.get('no_new', False)
@@ -136,12 +165,14 @@ class Check(object):
             old_errors = context.run_script([
                     self.check_script,
                     context.old_source.full_path(self.filename)],
-                    env=self.env)
+                    env=self.env,
+                    timeout=10)
 
         new_errors = context.run_script([
                 self.check_script,
                 context.new_source.full_path(self.filename)],
-                env=self.env)
+                env=self.env,
+                timeout=10)
 
         self._diff_errors(old_errors, new_errors)
 
@@ -187,6 +218,9 @@ class Checks(object):
             with context.error_catcher():
                 check.run(context)
         context.writer.done()
+
+    def __repr__(self):
+        return 'Checks(%r)' % self.checks
 
 
 class RunResult(object):
@@ -268,29 +302,36 @@ class RunContext(object):
                                  stderr=None,
                                  cwd=self.checks_path,
                                  env=run_env)
-            reader = BackgroundPipeReader(p.stdout)
-            reader.start()
+            OPEN_PROCESSES.append(p)
+            try:
+                reader = BackgroundPipeReader(p.stdout)
+                reader.start()
 
-            if timeout is None:
-                p.wait()
-                reader.join()
-            else:
-                t_warning = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
-                while not p.poll() and datetime.datetime.now() < t_warning:
-                    time.sleep(0.5)
-                if not p.poll():
-                    self.writer.warn('gpk', 'Command is taking a long time to complete. Press Ctrl-C to abort: %r' % cmd)
-                while not p.poll():
-                    time.sleep(0.5)
+                if timeout is None:
+                    p.wait()
+                    reader.join()
+                else:
+                    t_warning = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
+                    while p.poll() is None and datetime.datetime.now() < t_warning:
+                        time.sleep(0.01)
+                    if p.poll() is None:
+                        self.writer.warn('gpk',
+                                         ('Command is taking a long time to complete: %s' %
+                                          ' '.join(cmd)))
+                    p.wait()
+                if p.returncode != 0 and not ignore_exitcode:
+                    raise RuntimeError('%r exited with non-zero exit code %d' % (' '.join(cmd), p.returncode))
 
-            if p.returncode != 0 and not ignore_exitcode:
-                raise RuntimeError('%r exited with non-zero exit code %d' % (cmd, p.returncode))
-            return reader.str()
+                if interrupted:
+                    # I'd like to continue, but we can't
+                    raise Aborted('Interrupted by user')
+                return reader.str()
+            finally:
+                OPEN_PROCESSES.remove(p)
         except OSError, e:
             raise RuntimeError('Error while executing %r: %s' % (cmd, e))
         except KeyboardInterrupt:
-            p.kill()
-            raise RuntimeError('Command %r interrupted by user' % cmd)
+            raise Aborted('Command %r interrupted by user' % cmd)
 
     def error_catcher(self, **kwargs):
         return ErrorCatcher(self, **kwargs)
@@ -305,6 +346,9 @@ class ErrorCatcher(object):
         return self
 
     def __exit__(self, type, value, traceback):
+        if type is Aborted:
+            return False
+
         if type:
             self.context.errors.append(value)
             if self.print_progress:
@@ -312,6 +356,7 @@ class ErrorCatcher(object):
         else:
             if self.print_progress:
                 self.context.writer.ok()
+
         return True
 
 
