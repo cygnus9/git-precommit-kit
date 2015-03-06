@@ -1,8 +1,12 @@
 #!/bin/bash
-# Check source files for the phrase NOCOMMIT. Fail if it occurs.
+# Check source files for the phrase 'NO-COMMIT' (but without the dash). Fail if
+# it occurs (can't reproduce the term here literally or I wouldn't be able to
+# commit this file :)
 #
 # This is helpful when you temporarily need to change something in your source
 # to debug it (i.e., port changes, debug statements, etc), but have to take the
-# change out before you commit it. Marking it with NOCOMMIT helps you in case
+# change out before you commit it. Marking it with NO-COMMIT helps you in case
 # you accidentally forget it.
-grep -n 'NOCOMMIT' "$1" || exit 0
+p1=NO
+p2=COMMIT
+grep -n $p1$p2 "$1" || exit 0

@@ -324,7 +324,7 @@ class RunContext(object):
                                           ' '.join(cmd)))
                     p.wait()
                 if p.returncode != 0 and not ignore_exitcode:
-                    raise ScriptError('%r exited with non-zero exit code %d' % (' '.join(cmd), p.returncode))
+                    raise ScriptError('%r exited with non-zero exit code %d:\n%s' % (' '.join(cmd), p.returncode, reader.str()))
 
                 if interrupted:
                     # I'd like to continue, but we can't
