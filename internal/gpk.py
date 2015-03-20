@@ -188,8 +188,8 @@ class Check(object):
             return
 
         # Compare errors, retain only new ones
-        old_lines = old_errors.split('\n')
-        new_lines = new_errors.split('\n')
+        old_lines = [l for l in old_errors.split('\n') if l.strip()]
+        new_lines = [l for l in new_errors.split('\n') if l.strip()]
         s = difflib.SequenceMatcher(a=old_lines, b=new_lines,
                                     isjunk=lambda x: not x.strip()) # Ignore empty lines
 
