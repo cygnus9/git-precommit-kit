@@ -31,7 +31,8 @@ def main():
     changed_files = filter(None, gpk.shell([
             'git', 'diff', '--cached',
                            '--name-only',
-                           '--diff-filter=ACMR'
+                           '--diff-filter=ACMR',
+                           '--no-prefix'
             ]).split('\n'))
 
     checks = gpk.find_checks(repo_root, changed_files, gpk_path)
